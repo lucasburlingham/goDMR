@@ -1,0 +1,16 @@
+[Unit]
+Description=DMR API Backend
+After=network.target
+
+[Service]
+Type=simple
+User=dmr
+Group=dmr
+WorkingDirectory=/opt/dmr-backend
+ExecStart=/opt/dmr-backend/dmr-api
+Restart=always
+RestartSec=5
+Environment=GODEBUG=netdns=go
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>DMR Engine Config</title>
+	<style>
+		body {
+			font-family: sans-serif;
+			max-width: 500px;
+			margin: 2rem auto;
+		}
+
+		label {
+			display: block;
+			margin-top: 1rem;
+		}
+
+		input {
+			width: 100%;
+			padding: 0.25rem;
+		}
+
+		button {
+			margin-top: 1rem;
+			padding: 0.5rem 1rem;
+		}
+
+		#resetConfig {
+			background-color: red;
+			color: white;
+			border: 1px black solid;
+		}
+
+		#status {
+			margin-top: 1rem;
+			font-weight: bold;
+		}
+	</style>
+</head>
+
+<body>
+	<h1>DMR Engine Config</h1>
+
+	<form id="configForm">
+		<label>Callsign: <input type="text" id="callsign"></label>
+		<label>DMR ID: <input type="number" id="dmr_id"></label>
+		<label>Frequency (MHz): <input type="number" step="0.001" id="frequency"></label>
+		<label>Timeslot: <input type="number" id="timeslot" min="1" max="2"></label>
+		<label>Color Code: <input type="number" id="color_code" min="0" max="15"></label>
+		<button type="submit">Save Configuration</button>
+	</form>
+
+	<div id="status"></div>
+
+	<button id="resetConfig">
+		Reset to Default Configuration
+	</button>
+	<button id="backupConfig" class="button">
+		Backup config.ini file
+	</button>
+	<button id="stopEngine">
+		Stop DMR Engine
+	</button>
+	<button id="startEngine">
+		Start DMR Engine
+	</button>
+
+
+
+	<script>
+		async function loadStatus() {
+			const res = await fetch('http://127.0.0.1:8080/api/status');
+			const data = await res.json();
+
+			document.getElementById('callsign').value = data.callsign;
+			document.getElementById('dmr_id').value = data.dmr_id;
+			document.getElementById('frequency').value = data.frequency;
+			document.getElementById('timeslot').value = data.timeslot;
+			document.getElementById('color_code').value = data.color_code;
+
+			const serviceStatus = Object.entries(data.services)
+				.map(([k, v]) => `${k}: ${v}`).join(', ');
+			document.getElementById('status').textContent = `Current status → ${serviceStatus}`;
+		}
+
+		document.getElementById('configForm').addEventListener('submit', async (e) => {
+			e.preventDefault();
+
+			const payload = {
+				callsign: document.getElementById('callsign').value,
+				dmr_id: Number(document.getElementById('dmr_id').value),
+				frequency: Number(document.getElementById('frequency').value),
+				timeslot: Number(document.getElementById('timeslot').value),
+				color_code: Number(document.getElementById('color_code').value)
+			};
+
+			const res = await fetch('http://127.0.0.1:8080/api/config', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
+			});
+
+			const result = await res.json();
+			document.getElementById('status').textContent = `Saved → ${JSON.stringify(result)}`;
+
+			loadStatus(); // Refresh after saving
+		});
+
+		// Initial load
+		loadStatus();
+
+
+		document.getElementById('resetConfig').addEventListener('click', async () => {
+
+			if (!confirm('Are you sure you want to reset the configuration to defaults? This action cannot be undone.')) {
+				return;
+			}
+			// Post to /api/reset
+			try {
+				const res = await fetch('http://127.0.0.1:8080/api/reset', { method: 'POST' });
+				if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+				const ct = res.headers.get('content-type') || '';
+				let result;
+				if (ct.includes('application/json')) {
+					result = await res.json();
+					document.getElementById('status').textContent = `Reset → ${JSON.stringify(result)}`;
+				} else {
+					result = await res.text();
+					document.getElementById('status').textContent = `Reset → ${result}`;
+				}
+			} catch (err) {
+				document.getElementById('status').textContent = `Reset error → ${err.message}`;
+			}
+			loadStatus(); // Refresh after reset
+		});
+
+		document.getElementById('backupConfig').addEventListener('click', async () => {
+			// Redirect user to download the config.ini file in a new tab
+			window.open('http://127.0.0.1:8080/api/backup', '_blank', 'noopener noreferrer');
+		});
+	</script>
+</body>
+
+</html>
